@@ -1,14 +1,13 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { GameCanvas, GameCanvasHandle } from './components/GameCanvas';
 import { UIOverlay } from './components/UIOverlay';
 import { GameState, GameStats, Upgrade, PlayerAttributes, InputMode } from './types';
-import { PLAYER_STATS, XP_BASE } from './constants';
+import { PLAYER_STATS, XP_BASE, CUSTOM_AVATAR_KEY, STAGE_CONFIG } from './constants';
 
 function App() {
   const [gameState, setGameState] = useState<GameState>(GameState.DEVICE_SELECT);
   const [inputMode, setInputMode] = useState<InputMode>(InputMode.MOUSE_KB);
-  const [stats, setStats] = useState<GameStats>({ score: 0, kills: 0, timeAlive: 0, difficulty: 1, playerLevel: 1 });
+  const [stats, setStats] = useState<GameStats>({ score: 0, kills: 0, timeAlive: 0, difficulty: 1, playerLevel: 1, stageName: STAGE_CONFIG[0].name });
   const [playerHp, setPlayerHp] = useState(PLAYER_STATS.baseMaxHp);
   const [playerMaxHp, setPlayerMaxHp] = useState(PLAYER_STATS.baseMaxHp); 
   const [playerXp, setPlayerXp] = useState(0);
@@ -17,7 +16,20 @@ function App() {
   const [abilityCooldown, setAbilityCooldown] = useState<{current: number, max: number}>({current: 0, max: 10});
   const [volume, setVolume] = useState(0.5);
   
+  // New State for Avatar
+  const [customAvatar, setCustomAvatar] = useState<string | null>(null);
+
   const canvasRef = useRef<GameCanvasHandle>(null);
+
+  useEffect(() => {
+      const savedAvatar = localStorage.getItem(CUSTOM_AVATAR_KEY);
+      if (savedAvatar) setCustomAvatar(savedAvatar);
+  }, []);
+
+  const handleSaveAvatar = (b64: string) => {
+      setCustomAvatar(b64);
+      localStorage.setItem(CUSTOM_AVATAR_KEY, b64);
+  };
 
   const handleDeviceSelect = (mode: InputMode) => {
     setInputMode(mode);
@@ -75,6 +87,7 @@ function App() {
         setAbilityCooldown={setAbilityCooldown}
         onLevelUp={handleLevelUp}
         volume={volume}
+        customAvatar={customAvatar}
       />
       <UIOverlay 
         gameState={gameState} 
@@ -95,6 +108,11 @@ function App() {
         onUpgradeSelect={handleUpgradeSelect}
         onResume={handleResume}
         onTriggerAbility={handleTriggerAbility}
+        onOpenLeaderboard={() => setGameState(GameState.LEADERBOARD)}
+        onOpenCustomize={() => setGameState(GameState.CUSTOMIZE)}
+        onBackToMenu={() => setGameState(GameState.MENU)}
+        customAvatar={customAvatar}
+        onSaveAvatar={handleSaveAvatar}
       />
     </div>
   );
