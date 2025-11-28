@@ -1,4 +1,5 @@
 
+
 export enum GameState {
   DEVICE_SELECT = 'DEVICE_SELECT',
   MENU = 'MENU',
@@ -22,18 +23,22 @@ export enum EnemyType {
   TANK = 'TANK',
   CHARGER = 'CHARGER', 
   EXPLODER = 'EXPLODER',
-  SNIPER = 'SNIPER', // New Ranged Enemy
+  SNIPER = 'SNIPER', 
+  GHOST = 'GHOST',      
+  SPLITTER = 'SPLITTER', 
   ELITE = 'ELITE',
   // Boss Tiers
-  BOSS_GOLIATH = 'BOSS_GOLIATH', // Stage 1 Boss (Tanky)
-  BOSS_SWARMER = 'BOSS_SWARMER', // Stage 2 Boss (Fast)
-  BOSS_TITAN = 'BOSS_TITAN',     // Stage 3+ Boss (Massive)
+  BOSS_GOLIATH = 'BOSS_GOLIATH', // Stage 1 Boss (Tanky + Charge)
+  BOSS_SWARMER = 'BOSS_SWARMER', // Stage 2 Boss (Summons)
+  BOSS_TITAN = 'BOSS_TITAN',     // Stage 3+ Boss (Bullet Hell)
 }
 
 export enum WeaponType {
   RANGED = 'RANGED',
   MELEE = 'MELEE',
-  ORBITAL = 'ORBITAL'
+  ORBITAL = 'ORBITAL',
+  BOOMERANG = 'BOOMERANG', 
+  MINE = 'MINE'            
 }
 
 export enum UpgradeType {
@@ -56,12 +61,21 @@ export enum UpgradeType {
   WEAPON_SLOT = 'WEAPON_SLOT', 
   FREEZE = 'FREEZE',           
   CHAIN_LIGHTNING = 'CHAIN_LIGHTNING',
+  // New Passive Skills
+  STATIC_FIELD = 'STATIC_FIELD',
+  DRONE_SUPPORT = 'DRONE_SUPPORT',
+  // Evolutions
   EVO_SHOTGUN = 'EVO_SHOTGUN',       
-  EVO_SNIPER = 'EVO_SNIPER',         
+  EVO_SNIPER = 'EVO_SNIPER',
+  EVO_OVERLOAD = 'EVO_OVERLOAD', // Standard Evo: Overload Cannon         
   EVO_HOMING = 'EVO_HOMING',         
   EVO_INCENDIARY = 'EVO_INCENDIARY', 
   EVO_GIANT_SABER = 'EVO_GIANT_SABER', 
-  EVO_NOVA_ORBS = 'EVO_NOVA_ORBS',     
+  EVO_NOVA_ORBS = 'EVO_NOVA_ORBS',
+  EVO_QUANTUM_STORM = 'EVO_QUANTUM_STORM', // Boomerang Evo
+  EVO_GRAVITY_WELL = 'EVO_GRAVITY_WELL',   // Mine Evo
+  EVO_THUNDER_GOD = 'EVO_THUNDER_GOD',     // Static Field Evo
+  EVO_ASSAULT_DRONE = 'EVO_ASSAULT_DRONE', // Drone Evo
 }
 
 export interface Upgrade {
@@ -118,12 +132,17 @@ export interface Player extends Entity {
   autoAim: boolean;
   freezeEffect: number; 
   chainLightningChance: number; 
+  // Evolution Flags
   isShotgun?: boolean;
   isSniper?: boolean;
+  isOverload?: boolean; // Overload Cannon
   isHoming?: boolean;
   isIncendiary?: boolean;
   isGiantSaber?: boolean;
   isNovaOrbs?: boolean;
+  isQuantumStorm?: boolean;
+  isGravityWell?: boolean;
+  // Stats
   shield: number;
   maxShield: number;
   shieldRegenDelay: number; 
@@ -139,6 +158,16 @@ export interface Player extends Entity {
   maxXp: number;
   level: number;
   upgrades: Record<string, number>; 
+  // New Passive Props
+  staticFieldRange: number;
+  staticFieldDmg: number;
+  staticFieldTimer: number;
+  droneCount: number;
+  droneFireTimer: number;
+  droneFireRate: number;
+  droneDmg: number;
+  isThunderGod?: boolean;
+  isAssaultDrone?: boolean;
 }
 
 export interface PlayerAttributes {
@@ -161,10 +190,12 @@ export interface PlayerAttributes {
   area: number;
   isShotgun?: boolean;
   isSniper?: boolean;
+  isOverload?: boolean;
   isHoming?: boolean;
   isIncendiary?: boolean;
   isGiantSaber?: boolean;
   isNovaOrbs?: boolean;
+  isQuantumStorm?: boolean;
 }
 
 export interface Enemy extends Entity {
@@ -177,8 +208,10 @@ export interface Enemy extends Entity {
   frozenTimer?: number; 
   burnTimer?: number; 
   pushback: Vector2; 
-  // Sniper props
-  attackTimer?: number;
+  // Mechanics
+  attackTimer?: number; // Used for Sniper, Boss abilities
+  actionState?: 'IDLE' | 'CHARGE' | 'ATTACK';
+  isEnraged?: boolean;
 }
 
 export interface Projectile extends Entity {
@@ -198,6 +231,12 @@ export interface Projectile extends Entity {
   duration?: number; 
   maxDuration?: number;
   swingAngle?: number;
+  // New Mechanics
+  isBoomerang?: boolean;
+  returnSpeed?: number;
+  isMine?: boolean;
+  isGravityWell?: boolean;
+  isDroneShot?: boolean;
 }
 
 export interface EnemyProjectile extends Entity {

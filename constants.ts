@@ -1,4 +1,6 @@
 
+
+
 import { EnemyType, StarterWeapon, Upgrade, UpgradeType, WeaponType } from "./types";
 
 export const CANVAS_WIDTH = window.innerWidth;
@@ -7,7 +9,7 @@ export const WORLD_WIDTH = 2500;
 export const WORLD_HEIGHT = 2500;
 export const LEADERBOARD_KEY = 'cyber_survival_leaderboard_v1';
 export const CUSTOM_AVATAR_KEY = 'cyber_survival_avatar_v1';
-export const MAX_WEAPONS = 3; 
+export const MAX_WEAPONS = 4; // Increased to allow more variety
 
 export const PLAYER_STATS = {
   radius: 16,
@@ -34,7 +36,6 @@ export const XP_GROWTH_EXPONENT = 1.15;
 export const OBSTACLE_COUNT = 8; 
 
 // --- STAGE CONFIGURATION (BIOMES - BASED ON KILLS) ---
-// threshold: Kills needed to reach this stage
 export const STAGE_CONFIG = [
     { threshold: 0, name: "NEON OUTSKIRTS", hue: 200, densityMult: 1.0, boss: EnemyType.BOSS_GOLIATH }, 
     { threshold: 400, name: "RUST SECTOR", hue: 25, densityMult: 1.4, boss: EnemyType.BOSS_SWARMER }, 
@@ -112,7 +113,7 @@ export const STARTER_WEAPONS: StarterWeapon[] = [
     stats: {
       projectileCount: 1,
       damageMultiplier: 2.5,
-      fireRateMultiplier: 2.0, // Nerfed: Even slower to balance high dmg
+      fireRateMultiplier: 2.0, 
       areaMultiplier: 1.2, 
       maxHp: 180,
       hp: 180,
@@ -132,6 +133,38 @@ export const STARTER_WEAPONS: StarterWeapon[] = [
       areaMultiplier: 1.2,
       maxHp: 140,
       hp: 140,
+    }
+  },
+  {
+    id: 'quantum_blade',
+    type: WeaponType.BOOMERANG,
+    name: '量子回旋刃',
+    description: '投掷出回旋利刃，穿透路径上的敌人并飞回。必须接住才能再次投掷。',
+    color: '#fff', 
+    stats: {
+      projectileCount: 1,
+      damageMultiplier: 1.5,
+      fireRateMultiplier: 1.2,
+      bulletSpeedMultiplier: 1.5,
+      piercing: 999, // Infinite pierce for boomerang
+      maxHp: 130,
+      hp: 130,
+    }
+  },
+  {
+    id: 'void_trap',
+    type: WeaponType.MINE,
+    name: '虚空陷阱',
+    description: '放置高伤害隐形地雷。适合阵地战。',
+    color: '#52525b', 
+    stats: {
+      projectileCount: 1,
+      damageMultiplier: 4.0, // Very High Damage
+      fireRateMultiplier: 1.5, 
+      blastRadius: 80,
+      bulletSpeedMultiplier: 0, // Stationary
+      maxHp: 200,
+      hp: 200,
     }
   }
 ];
@@ -256,11 +289,34 @@ export const UPGRADES_POOL: Upgrade[] = [
     description: '攻击有 30% 概率触发连锁闪电。',
     rarity: 'EPIC',
   },
+  // NEW PASSIVE UPGRADES
+  {
+    id: 'static_field_1',
+    type: UpgradeType.STATIC_FIELD,
+    name: '静电立场',
+    description: '对周围敌人每秒造成伤害 (被动技能)。',
+    rarity: 'EPIC',
+  },
+  {
+    id: 'drone_1',
+    type: UpgradeType.DRONE_SUPPORT,
+    name: '战斗无人机',
+    description: '召唤无人机自动攻击最近的敌人。',
+    rarity: 'LEGENDARY',
+  },
+  // EVOLUTIONS
   {
     id: 'evo_shotgun',
     type: UpgradeType.EVO_SHOTGUN,
     name: '进化：暴乱镇压者',
     description: '(标准型) 牺牲射程换取全屏弹幕。',
+    rarity: 'LEGENDARY',
+  },
+  {
+    id: 'evo_overload',
+    type: UpgradeType.EVO_OVERLOAD,
+    name: '进化：超载火炮',
+    description: '(标准型) 射速降低，子弹数量和伤害巨幅提升。',
     rarity: 'LEGENDARY',
   },
   {
@@ -288,7 +344,7 @@ export const UPGRADES_POOL: Upgrade[] = [
     id: 'evo_giant_saber',
     type: UpgradeType.EVO_GIANT_SABER,
     name: '进化：泰坦斩击',
-    description: '(光剑) 360度旋风斩，范围适度增加。', // Description updated, removed "super big" implication
+    description: '(光剑) 360度旋风斩，范围适度增加。', 
     rarity: 'LEGENDARY',
   },
   {
@@ -297,7 +353,28 @@ export const UPGRADES_POOL: Upgrade[] = [
     name: '进化：超新星',
     description: '(飞环) 飞环数量翻倍，并周期性向外发射脉冲。',
     rarity: 'LEGENDARY',
-  }
+  },
+  {
+    id: 'evo_quantum_storm',
+    type: UpgradeType.EVO_QUANTUM_STORM,
+    name: '进化：量子风暴',
+    description: '(回旋刃) 数量翻倍，无限射程，飞行速度极快。',
+    rarity: 'LEGENDARY',
+  },
+  {
+    id: 'evo_gravity_well',
+    type: UpgradeType.EVO_GRAVITY_WELL,
+    name: '进化：引力奇点',
+    description: '(陷阱) 陷阱触发后生成黑洞，牵引并粉碎敌人。',
+    rarity: 'LEGENDARY',
+  },
+  {
+    id: 'evo_thunder_god',
+    type: UpgradeType.EVO_THUNDER_GOD,
+    name: '进化：雷神降临',
+    description: '(静电) 范围极大增加，伤害翻倍，频率加快。',
+    rarity: 'LEGENDARY',
+  },
 ];
 
 // SPEEDS UPDATED TO PIXELS PER SECOND
@@ -331,6 +408,16 @@ export const ENEMY_CONFIG: Record<EnemyType, {
     score: 20,
     minTime: 60, 
   },
+  [EnemyType.SPLITTER]: {
+    baseHp: 80,
+    baseSpeed: 120,
+    baseDamage: 10,
+    radius: 18,
+    color: '#84cc16', // Lime
+    xpValue: 40,
+    score: 35,
+    minTime: 120,
+  },
   [EnemyType.CHARGER]: {
     baseHp: 60,
     baseSpeed: 350, 
@@ -360,6 +447,16 @@ export const ENEMY_CONFIG: Record<EnemyType, {
     xpValue: 60,
     score: 40,
     minTime: 200, 
+  },
+  [EnemyType.GHOST]: {
+    baseHp: 60,
+    baseSpeed: 70, // Slow but persistent
+    baseDamage: 12,
+    radius: 14,
+    color: '#94a3b8', // Slate grey
+    xpValue: 50,
+    score: 40,
+    minTime: 300,
   },
   [EnemyType.EXPLODER]: {
     baseHp: 120,
@@ -394,7 +491,7 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   },
   [EnemyType.BOSS_SWARMER]: {
     baseHp: 15000,
-    baseSpeed: 300, 
+    baseSpeed: 250, 
     baseDamage: 40,
     radius: 60,
     color: '#f0abfc', // Pink
@@ -404,7 +501,7 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   },
   [EnemyType.BOSS_TITAN]: {
     baseHp: 50000,
-    baseSpeed: 150, 
+    baseSpeed: 120, 
     baseDamage: 100,
     radius: 100,
     color: '#ef4444', // Red

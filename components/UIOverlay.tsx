@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { GameState, GameStats, StarterWeapon, Upgrade, UpgradeType, PlayerAttributes, InputMode, LeaderboardEntry } from '../types';
 import { analyzeBattle, generateAvatar } from '../services/geminiService';
@@ -181,6 +183,32 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
               })}
           </div>
       );
+  };
+
+  const renderSpecialModules = (attrs: PlayerAttributes) => {
+    const modules = [];
+    if (attrs.isShotgun) modules.push({ name: "暴乱镇压", color: "text-orange-400" });
+    if (attrs.isSniper) modules.push({ name: "高斯狙击", color: "text-purple-400" });
+    if (attrs.isOverload) modules.push({ name: "超载火炮", color: "text-red-500" });
+    if (attrs.isHoming) modules.push({ name: "智能追踪", color: "text-green-400" });
+    if (attrs.isIncendiary) modules.push({ name: "地狱火", color: "text-red-500" });
+    if (attrs.isGiantSaber) modules.push({ name: "泰坦斩击", color: "text-pink-500" });
+    if (attrs.isNovaOrbs) modules.push({ name: "超新星", color: "text-cyan-400" });
+    if (attrs.isQuantumStorm) modules.push({ name: "量子风暴", color: "text-blue-400" });
+    if (attrs.upgrades[UpgradeType.STATIC_FIELD]) modules.push({ name: `静电场 Lv.${attrs.upgrades[UpgradeType.STATIC_FIELD]}`, color: "text-blue-300" });
+    if (attrs.upgrades[UpgradeType.DRONE_SUPPORT]) modules.push({ name: `无人机 x${attrs.upgrades[UpgradeType.DRONE_SUPPORT]}`, color: "text-yellow-300" });
+
+    if (modules.length === 0) return <div className="text-slate-500 text-xs italic">暂无特殊模组</div>;
+    
+    return (
+        <div className="flex flex-wrap gap-2">
+            {modules.map((m, i) => (
+                <span key={i} className={`px-2 py-1 rounded bg-slate-900 border border-slate-700 text-[10px] font-bold uppercase ${m.color}`}>
+                    {m.name}
+                </span>
+            ))}
+        </div>
+    );
   };
 
   // --- Device Select ---
@@ -407,30 +435,36 @@ export const UIOverlay: React.FC<UIOverlayProps> = ({
   if (gameState === GameState.PAUSED) {
       return (
           <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-50 backdrop-blur font-sans">
-              <div className="bg-slate-800 p-8 rounded-xl border border-slate-600 shadow-2xl max-w-2xl w-full">
+              <div className="bg-slate-800 p-8 rounded-xl border border-slate-600 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                   <h2 className="text-3xl font-bold text-white mb-6 text-center">PAUSED</h2>
                   
                   {playerAttributes && (
-                      <div className="grid grid-cols-2 gap-8 mb-8">
-                          <div>
-                              <h3 className="text-cyan-400 font-bold mb-2 border-b border-slate-700 pb-1">当前状态</h3>
-                              <div className="text-sm space-y-1 text-slate-300">
-                                  <div className="flex justify-between"><span>武器</span><span className="text-white">{playerAttributes.weaponName}</span></div>
-                                  <div className="flex justify-between"><span>伤害</span><span className="text-white">{Math.round(playerAttributes.damage)}</span></div>
-                                  <div className="flex justify-between"><span>攻速</span><span className="text-white">{(playerAttributes.fireRate)}/s</span></div>
-                                  <div className="flex justify-between"><span>生命</span><span className="text-white">{Math.round(playerAttributes.maxHp)}</span></div>
-                                  <div className="flex justify-between"><span>护盾</span><span className="text-white">{Math.round(playerAttributes.shield)}</span></div>
-                                  <div className="flex justify-between"><span>范围</span><span className="text-white">x{playerAttributes.area}</span></div>
+                      <div className="space-y-6">
+                          <div className="grid grid-cols-2 gap-8">
+                              <div>
+                                  <h3 className="text-cyan-400 font-bold mb-2 border-b border-slate-700 pb-1">当前状态</h3>
+                                  <div className="text-sm space-y-1 text-slate-300">
+                                      <div className="flex justify-between"><span>武器</span><span className="text-white">{playerAttributes.weaponName}</span></div>
+                                      <div className="flex justify-between"><span>伤害</span><span className="text-white">{Math.round(playerAttributes.damage)}</span></div>
+                                      <div className="flex justify-between"><span>攻速</span><span className="text-white">{(playerAttributes.fireRate)}/s</span></div>
+                                      <div className="flex justify-between"><span>生命</span><span className="text-white">{Math.round(playerAttributes.maxHp)}</span></div>
+                                      <div className="flex justify-between"><span>护盾</span><span className="text-white">{Math.round(playerAttributes.shield)}</span></div>
+                                      <div className="flex justify-between"><span>范围</span><span className="text-white">x{playerAttributes.area}</span></div>
+                                  </div>
+                              </div>
+                              <div>
+                                  <h3 className="text-yellow-400 font-bold mb-2 border-b border-slate-700 pb-1">特殊模组</h3>
+                                  {renderSpecialModules(playerAttributes)}
                               </div>
                           </div>
                           <div>
-                              <h3 className="text-yellow-400 font-bold mb-2 border-b border-slate-700 pb-1">已安装模块</h3>
+                              <h3 className="text-slate-300 font-bold mb-2 border-b border-slate-700 pb-1">已安装升级</h3>
                               {renderUpgradeGrid(playerAttributes)}
                           </div>
                       </div>
                   )}
 
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 mt-8">
                       <button onClick={onResume} className="w-full py-3 bg-cyan-600 text-white font-bold rounded hover:bg-cyan-500">继续战斗</button>
                       <button onClick={onRestart} className="w-full py-3 bg-slate-700 text-white font-bold rounded hover:bg-slate-600">放弃任务 (重开)</button>
                   </div>

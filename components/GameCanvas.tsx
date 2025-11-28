@@ -63,7 +63,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   const regenTimerRef = useRef<number>(0);
   const lastUiUpdateRef = useRef<number>(0);
   const shakeRef = useRef<number>(0);
-  const nextBossTimeRef = useRef<number>(60); // First boss at 60s (Much Faster)
+  const nextBossTimeRef = useRef<number>(60); 
   
   const cameraRef = useRef<Vector2>({ x: 0, y: 0 });
   const avatarImageRef = useRef<HTMLImageElement | null>(null);
@@ -113,12 +113,20 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     maxXp: XP_BASE,
     level: 1,
     upgrades: {},
+    // Passives
+    staticFieldRange: 0,
+    staticFieldDmg: 0,
+    staticFieldTimer: 0,
+    droneCount: 0,
+    droneFireTimer: 0,
+    droneFireRate: 1.5,
+    droneDmg: 10
   });
   
   const obstaclesRef = useRef<Obstacle[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
   const bulletsRef = useRef<Projectile[]>([]);
-  const enemyBulletsRef = useRef<EnemyProjectile[]>([]); // New: Enemy Projectiles
+  const enemyBulletsRef = useRef<EnemyProjectile[]>([]); 
   const particlesRef = useRef<Particle[]>([]);
   const lootRef = useRef<Loot[]>([]);
   const floatingTextsRef = useRef<FloatingText[]>([]);
@@ -202,9 +210,19 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       p.shockwaveCooldown = PLAYER_STATS.baseShockwaveCooldown;
       p.shockwaveRange = PLAYER_STATS.baseShockwaveRange;
       p.color = weaponConfig.color;
+      
+      // Passives Defaults
+      p.staticFieldRange = 0;
+      p.staticFieldDmg = 0;
+      p.droneCount = 0;
+      p.droneDmg = 15;
+      p.droneFireRate = 1.5;
 
+      // Reset Flags
       p.isShotgun = false; p.isSniper = false; p.isHoming = false; p.isIncendiary = false;
-      p.isGiantSaber = false; p.isNovaOrbs = false;
+      p.isGiantSaber = false; p.isNovaOrbs = false; p.isOverload = false;
+      p.isQuantumStorm = false; p.isGravityWell = false;
+      p.isThunderGod = false; p.isAssaultDrone = false;
 
       if (weaponConfig.stats.damageMultiplier) p.damageMultiplier *= weaponConfig.stats.damageMultiplier;
       if (weaponConfig.stats.fireRateMultiplier) p.fireRateMultiplier *= weaponConfig.stats.fireRateMultiplier;
@@ -221,19 +239,49 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       if (weaponId === 'standard') {
           if (p.upgrades[UpgradeType.EVO_SHOTGUN]) { p.isShotgun = true; p.projectileCount += 5; p.fireRateMultiplier *= 0.8; p.damageMultiplier *= 0.7; }
           if (p.upgrades[UpgradeType.EVO_SNIPER]) { p.isSniper = true; p.fireRateMultiplier *= 3.0; p.damageMultiplier *= 5.0; p.piercing += 99; p.bulletSpeedMultiplier *= 3.0; }
+          if (p.upgrades[UpgradeType.EVO_OVERLOAD]) { p.isOverload = true; p.projectileCount += 4; p.fireRateMultiplier *= 2.5; p.damageMultiplier *= 2.0; p.blastRadius = 20; }
       }
       if (weaponId === 'rocket_heavy') {
           if (p.upgrades[UpgradeType.EVO_HOMING]) { p.isHoming = true; }
           if (p.upgrades[UpgradeType.EVO_INCENDIARY]) { p.isIncendiary = true; p.blastRadius *= 1.5; }
       }
       if (weaponId === 'plasma_saber') {
-          if (p.upgrades[UpgradeType.EVO_GIANT_SABER]) { 
-            p.isGiantSaber = true; 
-            p.areaMultiplier *= 1.25; // NERFED: Was 1.5
-          } 
+          if (p.upgrades[UpgradeType.EVO_GIANT_SABER]) { p.isGiantSaber = true; p.areaMultiplier *= 1.25; } 
       }
       if (weaponId === 'psi_orbs') {
           if (p.upgrades[UpgradeType.EVO_NOVA_ORBS]) { p.isNovaOrbs = true; p.projectileCount *= 2; }
+      }
+      if (weaponId === 'quantum_blade') {
+          if (p.upgrades[UpgradeType.EVO_QUANTUM_STORM]) { 
+              p.isQuantumStorm = true; 
+              p.projectileCount += 2; 
+              p.fireRateMultiplier *= 0.5; // Faster fire
+          }
+      }
+      if (weaponId === 'void_trap') {
+          if (p.upgrades[UpgradeType.EVO_GRAVITY_WELL]) { p.isGravityWell = true; p.blastRadius *= 1.5; }
+      }
+
+      // Passive Skills Calculation
+      if (p.upgrades[UpgradeType.STATIC_FIELD]) {
+          const level = p.upgrades[UpgradeType.STATIC_FIELD];
+          p.staticFieldRange = 100 + (level * 25);
+          p.staticFieldDmg = 5 + (level * 5);
+          if (p.upgrades[UpgradeType.EVO_THUNDER_GOD]) {
+              p.isThunderGod = true;
+              p.staticFieldRange *= 1.5;
+              p.staticFieldDmg *= 3;
+          }
+      }
+
+      if (p.upgrades[UpgradeType.DRONE_SUPPORT]) {
+          p.droneCount = p.upgrades[UpgradeType.DRONE_SUPPORT];
+          if (p.upgrades[UpgradeType.EVO_ASSAULT_DRONE]) {
+              p.isAssaultDrone = true;
+              p.droneCount += 1;
+              p.droneFireRate = 0.5; // Very fast
+              p.droneDmg = 25;
+          }
       }
 
       if (p.upgrades[UpgradeType.DAMAGE]) p.damageMultiplier *= Math.pow(1.15, p.upgrades[UpgradeType.DAMAGE]);
@@ -309,6 +357,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       maxXp: XP_BASE,
       level: 1,
       upgrades: {},
+      staticFieldRange: 0,
+      staticFieldDmg: 0,
+      staticFieldTimer: 0,
+      droneCount: 0,
+      droneFireTimer: 0,
+      droneFireRate: 1.5,
+      droneDmg: 15
     };
     
     recalculateStats();
@@ -329,7 +384,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     lastUiUpdateRef.current = 0;
     shakeRef.current = 0;
     difficultyRef.current = 1;
-    nextBossTimeRef.current = 60; // Reset boss timer to 60s
+    nextBossTimeRef.current = 60; 
     currentStageIndexRef.current = 0;
     
     setStats({ score: 0, kills: 0, timeAlive: 0, difficulty: 1, playerLevel: 1, stageName: STAGE_CONFIG[0].name });
@@ -379,7 +434,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                   };
                   spawnFloatingText(e.pos, `${dmg}`, '#06b6d4', 24);
               }
-              // Clean enemy bullets in range
               enemyBulletsRef.current = enemyBulletsRef.current.filter(b => Math.hypot(b.pos.x - p.pos.x, b.pos.y - p.pos.y) > range);
           }
       });
@@ -388,9 +442,13 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   const handleSwitchWeapon = useCallback(() => {
       const p = playerRef.current;
       if (p.inventory.length <= 1) return;
+      
       const currentWeaponId = p.inventory[p.activeWeaponIndex];
       if (currentWeaponId === 'psi_orbs') {
           bulletsRef.current = bulletsRef.current.filter(b => !b.isOrb);
+      }
+      if (currentWeaponId === 'quantum_blade' && !p.isQuantumStorm) {
+          bulletsRef.current = bulletsRef.current.filter(b => !b.isBoomerang);
       }
 
       p.activeWeaponIndex = (p.activeWeaponIndex + 1) % p.inventory.length;
@@ -433,7 +491,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   }));
 
   const spawnEnemy = (currentTimeSec: number) => {
-    // Determine Current Stage based on KILLS
     let stage = STAGE_CONFIG[0];
     for (let i = STAGE_CONFIG.length - 1; i >= 0; i--) {
         if (killsRef.current >= STAGE_CONFIG[i].threshold) {
@@ -443,23 +500,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         }
     }
 
-    // Frequent Boss Spawning with Quantity Scaling
     if (currentTimeSec >= nextBossTimeRef.current) {
         const cam = cameraRef.current;
-        
-        // Calculate boss count: 1 initial + 1 per 500 kills (roughly) or per 2 mins, capped at 5
         const bossCount = Math.min(5, 1 + Math.floor(killsRef.current / 500));
         const bossType = stage.boss;
         const config = ENEMY_CONFIG[bossType];
         
-        // HP Scaling based on Time AND Kills to ensure difficulty
-        // Boss HP scales 10% per minute, plus 10% per 100 kills
         const scalingFactor = 1 + (currentTimeSec / 60) * 0.2 + (killsRef.current / 1000) * 0.5;
 
         for (let i = 0; i < bossCount; i++) {
              const angle = (Math.PI * 2 / bossCount) * i;
-             const offset = 300;
-             const x = (cam.x + WORLD_WIDTH/2) + Math.cos(angle) * offset; // Spawn around center of view? No, around player
              const px = playerRef.current.pos.x + Math.cos(angle) * 400;
              const py = playerRef.current.pos.y + Math.sin(angle) * 400;
 
@@ -474,15 +524,16 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 damage: Math.floor(config.baseDamage * scalingFactor),
                 speed: config.baseSpeed + (scalingFactor * 5),
                 value: config.xpValue * scalingFactor,
-                pushback: {x:0,y:0}
+                pushback: {x:0,y:0},
+                attackTimer: 0,
+                actionState: 'IDLE'
             });
         }
 
-        spawnFloatingText({x: playerRef.current.pos.x, y: playerRef.current.pos.y - 100}, `⚠️ WARNING: ${bossCount}x TITAN SIGNALS ⚠️`, "#ef4444", 30);
+        spawnFloatingText({x: playerRef.current.pos.x, y: playerRef.current.pos.y - 100}, `⚠️ WARNING: ${bossCount}x ${bossType} ⚠️`, "#ef4444", 30);
         shakeRef.current = 40;
         audioParams.playLevelUp();
         
-        // Reset timer: Every 60 seconds a new wave comes
         nextBossTimeRef.current += 60; 
         return;
     }
@@ -490,10 +541,8 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     const maxEnemies = MAX_ENEMIES_BASE * stage.densityMult;
     if (enemiesRef.current.length >= maxEnemies) return;
 
-    // Hybrid Difficulty: Time + Kills
     let difficultyFactor = 1 + (currentTimeSec / 60) + (killsRef.current / 200);
     
-    // Only filter by Time for basic enemies, not boss
     const availableTypes = Object.values(EnemyType).filter(type => 
         currentTimeSec >= ENEMY_CONFIG[type].minTime && !type.startsWith('BOSS')
     );
@@ -501,12 +550,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     let selectedType = EnemyType.BASIC;
     const roll = Math.random();
     
-    if (availableTypes.includes(EnemyType.SNIPER) && roll < 0.05) selectedType = EnemyType.SNIPER;
-    else if (availableTypes.includes(EnemyType.EXPLODER) && roll < 0.08) selectedType = EnemyType.EXPLODER;
-    else if (availableTypes.includes(EnemyType.ELITE) && roll < 0.12) selectedType = EnemyType.ELITE;
-    else if (availableTypes.includes(EnemyType.CHARGER) && roll < 0.20) selectedType = EnemyType.CHARGER;
-    else if (availableTypes.includes(EnemyType.TANK) && roll < 0.30) selectedType = EnemyType.TANK;
-    else if (availableTypes.includes(EnemyType.FAST) && roll < 0.45) selectedType = EnemyType.FAST;
+    if (availableTypes.includes(EnemyType.GHOST) && roll < 0.05) selectedType = EnemyType.GHOST;
+    else if (availableTypes.includes(EnemyType.SNIPER) && roll < 0.10) selectedType = EnemyType.SNIPER;
+    else if (availableTypes.includes(EnemyType.SPLITTER) && roll < 0.15) selectedType = EnemyType.SPLITTER;
+    else if (availableTypes.includes(EnemyType.EXPLODER) && roll < 0.20) selectedType = EnemyType.EXPLODER;
+    else if (availableTypes.includes(EnemyType.ELITE) && roll < 0.25) selectedType = EnemyType.ELITE;
+    else if (availableTypes.includes(EnemyType.CHARGER) && roll < 0.35) selectedType = EnemyType.CHARGER;
+    else if (availableTypes.includes(EnemyType.TANK) && roll < 0.45) selectedType = EnemyType.TANK;
+    else if (availableTypes.includes(EnemyType.FAST) && roll < 0.60) selectedType = EnemyType.FAST;
 
     const config = ENEMY_CONFIG[selectedType];
     const cam = cameraRef.current;
@@ -530,9 +581,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         y = Math.max(50, Math.min(WORLD_HEIGHT - 50, y));
         
         let collides = false;
-        for (const obs of obstaclesRef.current) {
-            if (checkCircleRectCollision({x, y}, config.radius + 10, obs.pos, obs.width, obs.height)) {
-                collides = true; break;
+        if (selectedType !== EnemyType.GHOST) {
+            for (const obs of obstaclesRef.current) {
+                if (checkCircleRectCollision({x, y}, config.radius + 10, obs.pos, obs.width, obs.height)) {
+                    collides = true; break;
+                }
             }
         }
         if (!collides) validPos = true;
@@ -551,7 +604,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
           speed: config.baseSpeed,
           value: Math.ceil(config.xpValue * difficultyFactor * 0.5),
           pushback: {x:0, y:0},
-          attackTimer: 0 // Init for snipers
+          attackTimer: 0
         });
     }
   };
@@ -609,7 +662,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     const deltaTime = timestamp - lastTimeRef.current;
     lastTimeRef.current = timestamp;
 
-    const safeDelta = Math.min(deltaTime, 50); // Cap delta
+    const safeDelta = Math.min(deltaTime, 50); 
     const dtSec = safeDelta / 1000;
 
     gameTimeRef.current += safeDelta;
@@ -638,6 +691,72 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         }
         regenTimerRef.current = 0;
       }
+    }
+
+    // --- PASSIVE: STATIC FIELD ---
+    if (p.staticFieldRange > 0) {
+        p.staticFieldTimer += dtSec;
+        const tickRate = p.isThunderGod ? 0.3 : 0.8; 
+        if (p.staticFieldTimer >= tickRate) {
+            let hit = false;
+            for (const e of enemiesRef.current) {
+                const d = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y);
+                if (d < p.staticFieldRange) {
+                     e.hp -= p.staticFieldDmg * p.damageMultiplier;
+                     spawnFloatingText(e.pos, `${Math.floor(p.staticFieldDmg)}`, '#60a5fa', 12);
+                     if (p.isThunderGod && Math.random() < 0.2) e.frozenTimer = 0.5;
+                     hit = true;
+                }
+            }
+            if (hit) {
+                 createExplosion(p.pos, '#60a5fa', 2);
+                 if (p.isThunderGod) audioParams.playLaser(); // Small zap sound
+            }
+            p.staticFieldTimer = 0;
+        }
+    }
+
+    // --- PASSIVE: DRONE SUPPORT ---
+    if (p.droneCount > 0) {
+        p.droneFireTimer += dtSec;
+        if (p.droneFireTimer >= p.droneFireRate) {
+            let fired = 0;
+            // Find target
+            let target: Enemy | null = null;
+            let minD = 500;
+            for(const e of enemiesRef.current) {
+                const d = Math.hypot(e.pos.x - p.pos.x, e.pos.y - p.pos.y);
+                if (d < minD) { minD = d; target = e; }
+            }
+
+            if (target) {
+                for(let i=0; i<p.droneCount; i++) {
+                     const droneAngle = (gameTimeRef.current/500) + (i * (Math.PI*2/p.droneCount));
+                     const dx = p.pos.x + Math.cos(droneAngle) * 50;
+                     const dy = p.pos.y + Math.sin(droneAngle) * 50;
+                     const aimAngle = Math.atan2(target.pos.y - dy, target.pos.x - dx);
+
+                     bulletsRef.current.push({
+                        id: 'DRONE_'+Math.random(),
+                        pos: {x: dx, y: dy},
+                        velocity: { x: Math.cos(aimAngle)*15, y: Math.sin(aimAngle)*15 },
+                        radius: 4,
+                        color: p.isAssaultDrone ? '#f59e0b' : '#34d399',
+                        damage: p.droneDmg * p.damageMultiplier,
+                        pierce: p.isAssaultDrone ? 1 : 0,
+                        explodeRadius: 0,
+                        freeze: 0, chain: false,
+                        hitIds: [],
+                        isDroneShot: true
+                     });
+                     fired++;
+                }
+                if(fired > 0) {
+                     audioParams.playShoot(2.0); // Higher pitch for drone
+                     p.droneFireTimer = 0;
+                }
+            }
+        }
     }
 
     let dx = 0, dy = 0;
@@ -722,10 +841,12 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
           area: parseFloat(p.areaMultiplier.toFixed(1)),
           isShotgun: p.isShotgun,
           isSniper: p.isSniper,
+          isOverload: p.isOverload,
           isHoming: p.isHoming,
           isIncendiary: p.isIncendiary,
           isGiantSaber: p.isGiantSaber,
-          isNovaOrbs: p.isNovaOrbs
+          isNovaOrbs: p.isNovaOrbs,
+          isQuantumStorm: p.isQuantumStorm
       });
       lastUiUpdateRef.current = timestamp;
     }
@@ -780,87 +901,146 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
              const worldMouseX = mouseRef.current.x + cameraRef.current.x;
              const worldMouseY = mouseRef.current.y + cameraRef.current.y;
              aimAngle = Math.atan2(worldMouseY - p.pos.y, worldMouseX - p.pos.x);
-             if (activeWeapon.type === WeaponType.ORBITAL || activeWeapon.type === WeaponType.MELEE) shouldFire = true; 
+             if (activeWeapon.type === WeaponType.ORBITAL || activeWeapon.type === WeaponType.MELEE || activeWeapon.type === WeaponType.MINE) shouldFire = true; 
              else shouldFire = mouseDownRef.current;
         }
     }
     p.angle = aimAngle;
 
     if (shouldFire && canFire) {
-        if (activeWeapon.type === WeaponType.ORBITAL) {
-            const orbCount = bulletsRef.current.filter(b => b.isOrb).length;
-            const desired = p.projectileCount;
-            if (orbCount < desired) {
-                for (let i = orbCount; i < desired; i++) {
-                    bulletsRef.current.push({
-                        id: Math.random().toString(),
-                        pos: { ...p.pos },
-                        radius: 8 * p.areaMultiplier,
-                        color: activeWeapon.color,
-                        velocity: {x:0,y:0},
-                        damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
-                        pierce: 999,
-                        explodeRadius: p.isNovaOrbs ? 50 : 0,
-                        freeze: p.freezeEffect,
-                        chain: false,
-                        isOrb: true,
-                        orbitAngle: (Math.PI * 2 / desired) * i,
-                        orbitRadius: 100 * p.areaMultiplier,
-                        hitIds: []
-                    });
-                }
+        // Boomerang Limit Check
+        if (activeWeapon.type === WeaponType.BOOMERANG && !p.isQuantumStorm) {
+            const activeBoomerangs = bulletsRef.current.filter(b => b.isBoomerang).length;
+            if (activeBoomerangs >= p.projectileCount) {
+                shouldFire = false; // Cannot fire until returned
             }
-        } 
-        else if (activeWeapon.type === WeaponType.MELEE) {
-            audioParams.playLaser();
-            bulletsRef.current.push({
-                id: Math.random().toString(),
-                pos: { ...p.pos },
-                radius: 80 * p.areaMultiplier, 
-                color: activeWeapon.color,
-                velocity: {x:0, y:0},
-                damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
-                pierce: 999,
-                explodeRadius: 0,
-                freeze: p.freezeEffect,
-                chain: false,
-                isMelee: true,
-                duration: 0.3,
-                maxDuration: 0.3,
-                swingAngle: aimAngle,
-                hitIds: []
-            });
-            lastFireTimeRef.current = timestamp;
-        } 
-        else {
-            if (p.blastRadius > 0) audioParams.playRocket();
-            else audioParams.playShoot(1.0 + Math.random()*0.2);
-            
-            const count = p.projectileCount;
-            for (let i = 0; i < count; i++) {
-                let offset = 0;
-                if (count > 1) offset = p.isShotgun ? (Math.random() - 0.5) * 0.8 : (i - (count - 1) / 2) * 0.1;
-                
+        }
+
+        if (shouldFire) {
+            if (activeWeapon.type === WeaponType.ORBITAL) {
+                const orbCount = bulletsRef.current.filter(b => b.isOrb).length;
+                const desired = p.projectileCount;
+                if (orbCount < desired) {
+                    for (let i = orbCount; i < desired; i++) {
+                        bulletsRef.current.push({
+                            id: Math.random().toString(),
+                            pos: { ...p.pos },
+                            radius: 8 * p.areaMultiplier,
+                            color: activeWeapon.color,
+                            velocity: {x:0,y:0},
+                            damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
+                            pierce: 999,
+                            explodeRadius: p.isNovaOrbs ? 50 : 0,
+                            freeze: p.freezeEffect,
+                            chain: false,
+                            isOrb: true,
+                            orbitAngle: (Math.PI * 2 / desired) * i,
+                            orbitRadius: 100 * p.areaMultiplier,
+                            hitIds: []
+                        });
+                    }
+                }
+            } 
+            else if (activeWeapon.type === WeaponType.MELEE) {
+                audioParams.playLaser();
                 bulletsRef.current.push({
                     id: Math.random().toString(),
                     pos: { ...p.pos },
-                    radius: p.blastRadius > 0 ? 8 : 4,
+                    radius: 80 * p.areaMultiplier, 
                     color: activeWeapon.color,
-                    velocity: {
-                        x: Math.cos(aimAngle + offset) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier,
-                        y: Math.sin(aimAngle + offset) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier
-                    },
+                    velocity: {x:0, y:0},
                     damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
-                    pierce: p.piercing,
-                    explodeRadius: p.blastRadius,
+                    pierce: 999,
+                    explodeRadius: 0,
                     freeze: p.freezeEffect,
-                    chain: p.chainLightningChance > 0 && Math.random() < p.chainLightningChance,
-                    homing: p.isHoming,
-                    incendiary: p.isIncendiary,
+                    chain: false,
+                    isMelee: true,
+                    duration: 0.3,
+                    maxDuration: 0.3,
+                    swingAngle: aimAngle,
                     hitIds: []
                 });
+                lastFireTimeRef.current = timestamp;
             }
-            lastFireTimeRef.current = timestamp;
+            else if (activeWeapon.type === WeaponType.MINE) {
+                const minesCount = bulletsRef.current.filter(b => b.isMine).length;
+                if (minesCount < 10) { 
+                    audioParams.playRocket(); 
+                    bulletsRef.current.push({
+                        id: Math.random().toString(),
+                        pos: { ...p.pos },
+                        radius: 12,
+                        color: activeWeapon.color,
+                        velocity: {x:0, y:0},
+                        damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
+                        pierce: 1, 
+                        explodeRadius: activeWeapon.stats.blastRadius || 60,
+                        freeze: p.freezeEffect,
+                        chain: false,
+                        isMine: true,
+                        isGravityWell: p.isGravityWell,
+                        duration: 30, 
+                        hitIds: []
+                    });
+                    lastFireTimeRef.current = timestamp;
+                }
+            }
+            else if (activeWeapon.type === WeaponType.BOOMERANG) {
+                audioParams.playShoot(0.5);
+                const count = p.isQuantumStorm ? 1 : 1; 
+                
+                for(let i=0; i<count; i++) {
+                    bulletsRef.current.push({
+                        id: Math.random().toString(),
+                        pos: { ...p.pos },
+                        radius: 12 * p.areaMultiplier,
+                        color: p.isQuantumStorm ? '#818cf8' : activeWeapon.color,
+                        velocity: {
+                            x: Math.cos(aimAngle) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier * (p.isQuantumStorm ? 1.5 : 1),
+                            y: Math.sin(aimAngle) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier * (p.isQuantumStorm ? 1.5 : 1)
+                        },
+                        damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
+                        pierce: 999,
+                        explodeRadius: 0,
+                        freeze: p.freezeEffect,
+                        chain: false,
+                        isBoomerang: true,
+                        returnSpeed: 0,
+                        hitIds: []
+                    });
+                }
+                lastFireTimeRef.current = timestamp;
+            }
+            else {
+                if (p.blastRadius > 0) audioParams.playRocket();
+                else audioParams.playShoot(1.0 + Math.random()*0.2);
+                
+                const count = p.projectileCount;
+                for (let i = 0; i < count; i++) {
+                    let offset = 0;
+                    if (count > 1) offset = p.isShotgun ? (Math.random() - 0.5) * 0.8 : (i - (count - 1) / 2) * 0.1;
+                    
+                    bulletsRef.current.push({
+                        id: Math.random().toString(),
+                        pos: { ...p.pos },
+                        radius: p.blastRadius > 0 ? 8 : 4,
+                        color: activeWeapon.color,
+                        velocity: {
+                            x: Math.cos(aimAngle + offset) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier,
+                            y: Math.sin(aimAngle + offset) * PLAYER_STATS.baseBulletSpeed * p.bulletSpeedMultiplier
+                        },
+                        damage: PLAYER_STATS.baseDamage * p.damageMultiplier,
+                        pierce: p.piercing,
+                        explodeRadius: p.blastRadius,
+                        freeze: p.freezeEffect,
+                        chain: p.chainLightningChance > 0 && Math.random() < p.chainLightningChance,
+                        homing: p.isHoming,
+                        incendiary: p.isIncendiary,
+                        hitIds: []
+                    });
+                }
+                lastFireTimeRef.current = timestamp;
+            }
         }
     }
 
@@ -876,7 +1056,6 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
             b.pos.y = p.pos.y + Math.sin(b.orbitAngle) * (b.orbitRadius || 100);
             
             if (p.isNovaOrbs) {
-                const cycle = Math.floor(gameTimeRef.current / 1000);
                 const isPulse = (gameTimeRef.current % 2000) < 500;
                 if (isPulse) b.radius = 20 * p.areaMultiplier; 
                 else b.radius = 8 * p.areaMultiplier;
@@ -890,8 +1069,58 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 bulletsRef.current.splice(i, 1);
                 continue;
             }
+        } else if (b.isMine) {
+            if (b.duration) b.duration -= dtSec;
+            if (b.duration && b.duration <= 0) {
+                 bulletsRef.current.splice(i, 1);
+                 continue;
+            }
+            if (b.isGravityWell) {
+                 // Gravity effect
+                 for(const e of enemiesRef.current) {
+                     const dx = b.pos.x - e.pos.x;
+                     const dy = b.pos.y - e.pos.y;
+                     const d = Math.sqrt(dx*dx + dy*dy);
+                     if (d < 200) {
+                         e.pos.x += dx * 0.05;
+                         e.pos.y += dy * 0.05;
+                     }
+                 }
+            }
         } else {
-            if (b.homing) {
+            // Boomerang Logic
+            if (b.isBoomerang) {
+                 b.returnSpeed = (b.returnSpeed || 0) + (dtSec * 1.0); // Acceleration factor for returning phase
+                 
+                 // Apply Drag to initial velocity
+                 const drag = 2.0;
+                 b.velocity.x -= b.velocity.x * dtSec * drag;
+                 b.velocity.y -= b.velocity.y * dtSec * drag;
+
+                 // Calculate vector to player
+                 const dx = p.pos.x - b.pos.x;
+                 const dy = p.pos.y - b.pos.y;
+                 const dist = Math.hypot(dx, dy);
+                 
+                 // Catch logic
+                 if (dist < 30 && b.returnSpeed > 1) { 
+                     bulletsRef.current.splice(i, 1);
+                     continue;
+                 }
+                 
+                 // Homing return logic
+                 const speedMult = p.isQuantumStorm ? 30 : 20;
+                 // Normalize direction
+                 if (dist > 0) {
+                     const dirX = dx / dist;
+                     const dirY = dy / dist;
+                     
+                     // Apply return velocity
+                     b.velocity.x += dirX * b.returnSpeed * speedMult * dtSec;
+                     b.velocity.y += dirY * b.returnSpeed * speedMult * dtSec;
+                 }
+            }
+            else if (b.homing) {
                 let target = null, minD = 600;
                 for (const e of enemiesRef.current) {
                     const d = Math.hypot(e.pos.x - b.pos.x, e.pos.y - b.pos.y);
@@ -913,7 +1142,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
             b.pos.x += b.velocity.x; 
             b.pos.y += b.velocity.y;
 
-            if (!b.pierce) { 
+            if (!b.pierce && !b.isBoomerang) { 
                 for (const obs of obstaclesRef.current) {
                     if (checkCircleRectCollision(b.pos, b.radius, obs.pos, obs.width, obs.height)) {
                         createExplosion(b.pos, '#94a3b8', 3);
@@ -922,14 +1151,14 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                     }
                 }
             }
-            if (b.pos.x < 0 || b.pos.x > WORLD_WIDTH || b.pos.y < 0 || b.pos.y > WORLD_HEIGHT) {
+            if (!b.isBoomerang && (b.pos.x < 0 || b.pos.x > WORLD_WIDTH || b.pos.y < 0 || b.pos.y > WORLD_HEIGHT)) {
                 bulletsRef.current.splice(i, 1);
                 continue;
             }
         }
     }
 
-    // Enemy Bullets (Snipers)
+    // Enemy Bullets (Snipers/Titans)
     for (let i = enemyBulletsRef.current.length - 1; i >= 0; i--) {
         const b = enemyBulletsRef.current[i];
         b.pos.x += b.velocity.x;
@@ -1004,6 +1233,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
         const angle = Math.atan2(p.pos.y - e.pos.y, p.pos.x - e.pos.x);
         
+        // Specialized Movement AI
         let moveX = Math.cos(angle) * speed * dtSec;
         let moveY = Math.sin(angle) * speed * dtSec;
         
@@ -1019,8 +1249,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 moveX = 0; moveY = 0; // Stop to shoot
                 e.attackTimer = (e.attackTimer || 0) + dtSec;
                 if (e.attackTimer > 2.0) {
-                    // Fire
-                    audioParams.playLaser(); // Re-use laser sound for sniper
+                    audioParams.playLaser(); 
                     enemyBulletsRef.current.push({
                         id: Math.random().toString(),
                         pos: {...e.pos},
@@ -1035,44 +1264,112 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 e.attackTimer = 0;
             }
         }
+        
+        // Multi-Stage Boss Logic
+        if (e.type.startsWith('BOSS')) {
+             const hpPct = e.hp / e.maxHp;
+             e.isEnraged = hpPct < 0.5;
+             e.attackTimer = (e.attackTimer || 0) + dtSec;
+
+             if (e.type === EnemyType.BOSS_GOLIATH) {
+                 // Charge attack
+                 const chargeInterval = e.isEnraged ? 3 : 5;
+                 if (e.actionState === 'CHARGE') {
+                      moveX *= 4; moveY *= 4; // Rush
+                      if (e.attackTimer > 0.5) { e.actionState = 'IDLE'; e.attackTimer = 0; }
+                 } else {
+                      if (e.attackTimer > chargeInterval) {
+                          e.actionState = 'CHARGE'; e.attackTimer = 0;
+                          createExplosion(e.pos, '#fbbf24', 10); // Warning effect
+                      }
+                 }
+             } else if (e.type === EnemyType.BOSS_SWARMER) {
+                 // Summon minions
+                 const summonInterval = e.isEnraged ? 4 : 8;
+                 if (e.attackTimer > summonInterval) {
+                     spawnFloatingText(e.pos, "SUMMON!", "#f0abfc", 24);
+                     for(let k=0; k<3; k++) {
+                         enemiesRef.current.push({
+                            id: 'MINION_'+Math.random(),
+                            pos: { x: e.pos.x + randomRange(-50,50), y: e.pos.y + randomRange(-50,50) },
+                            type: EnemyType.FAST,
+                            radius: 8, color: '#f87171',
+                            hp: 10, maxHp: 10, damage: 5, speed: 280,
+                            value: 5, pushback: {x:0,y:0}
+                         });
+                     }
+                     e.attackTimer = 0;
+                 }
+                 // Swarmer tries to keep distance
+                 const dist = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y);
+                 if (dist < 300) { moveX *= -0.5; moveY *= -0.5; }
+             } else if (e.type === EnemyType.BOSS_TITAN) {
+                 // Bullet Hell
+                 const fireInterval = e.isEnraged ? 0.5 : 1.5;
+                 moveX *= 0.2; moveY *= 0.2; // Slow move
+                 if (e.attackTimer > fireInterval) {
+                     const bulletCount = 12;
+                     for(let k=0; k<bulletCount; k++) {
+                         const ba = (Math.PI*2/bulletCount)*k + (gameTimeRef.current/1000);
+                         enemyBulletsRef.current.push({
+                             id: 'TITAN_SHOT_'+Math.random(),
+                             pos: {...e.pos},
+                             velocity: { x: Math.cos(ba)*6, y: Math.sin(ba)*6 },
+                             damage: 15, radius: 6, color: '#ef4444'
+                         });
+                     }
+                     e.attackTimer = 0;
+                 }
+             }
+        }
 
         let nextX = e.pos.x + moveX;
         let nextY = e.pos.y + moveY;
 
-        const isBoss = [EnemyType.BOSS_GOLIATH, EnemyType.BOSS_SWARMER, EnemyType.BOSS_TITAN].includes(e.type);
-        if (isBoss) {
-             for (let k = obstaclesRef.current.length - 1; k >= 0; k--) {
-                 const obs = obstaclesRef.current[k];
-                 if (checkCircleRectCollision({x: nextX, y: nextY}, e.radius, obs.pos, obs.width, obs.height)) {
-                     createExplosion(obs.pos, '#94a3b8', 20);
-                     obstaclesRef.current.splice(k, 1); 
-                     shakeRef.current = 10;
-                     audioParams.playExplosion();
+        // Collision logic
+        const isGhost = e.type === EnemyType.GHOST;
+        
+        if (!isGhost) {
+            const isBoss = e.type.startsWith('BOSS');
+            if (isBoss) {
+                 for (let k = obstaclesRef.current.length - 1; k >= 0; k--) {
+                     const obs = obstaclesRef.current[k];
+                     if (checkCircleRectCollision({x: nextX, y: nextY}, e.radius, obs.pos, obs.width, obs.height)) {
+                         createExplosion(obs.pos, '#94a3b8', 20);
+                         obstaclesRef.current.splice(k, 1); 
+                         shakeRef.current = 10;
+                         audioParams.playExplosion();
+                     }
                  }
-             }
-             e.pos.x = nextX;
-             e.pos.y = nextY;
-        } else {
-            let canMoveX = true;
-            for (const obs of obstaclesRef.current) {
-                 if (checkCircleRectCollision({x: nextX, y: e.pos.y}, e.radius, obs.pos, obs.width, obs.height)) {
-                     canMoveX = false; break;
-                 }
-            }
-            if (canMoveX) e.pos.x = nextX;
+                 e.pos.x = nextX;
+                 e.pos.y = nextY;
+            } else {
+                let canMoveX = true;
+                for (const obs of obstaclesRef.current) {
+                     if (checkCircleRectCollision({x: nextX, y: e.pos.y}, e.radius, obs.pos, obs.width, obs.height)) {
+                         canMoveX = false; break;
+                     }
+                }
+                if (canMoveX) e.pos.x = nextX;
 
-            let canMoveY = true;
-            for (const obs of obstaclesRef.current) {
-                 if (checkCircleRectCollision({x: e.pos.x, y: nextY}, e.radius, obs.pos, obs.width, obs.height)) {
-                     canMoveY = false; break;
-                 }
+                let canMoveY = true;
+                for (const obs of obstaclesRef.current) {
+                     if (checkCircleRectCollision({x: e.pos.x, y: nextY}, e.radius, obs.pos, obs.width, obs.height)) {
+                         canMoveY = false; break;
+                     }
+                }
+                if (canMoveY) e.pos.y = nextY;
+                
+                // Unstuck logic for big enemies
+                if (!canMoveX && !canMoveY && (e.type === EnemyType.ELITE || e.type === EnemyType.TANK)) {
+                     e.pos.x += Math.cos(angle + Math.PI/2) * speed * dtSec * 0.5;
+                     e.pos.y += Math.sin(angle + Math.PI/2) * speed * dtSec * 0.5;
+                }
             }
-            if (canMoveY) e.pos.y = nextY;
-            
-            if (!canMoveX && !canMoveY && (e.type === EnemyType.ELITE || e.type === EnemyType.TANK)) {
-                 e.pos.x += Math.cos(angle + Math.PI/2) * speed * dtSec * 0.5;
-                 e.pos.y += Math.sin(angle + Math.PI/2) * speed * dtSec * 0.5;
-            }
+        } else {
+            // Ghost moves freely
+            e.pos.x = nextX;
+            e.pos.y = nextY;
         }
 
         const dist = Math.hypot(p.pos.x - e.pos.x, p.pos.y - e.pos.y);
@@ -1150,6 +1447,23 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                     let dmg = b.damage;
                     if (b.isOrb && b.hitIds.includes(e.id) && Math.random() > 0.1) continue;
                     if (b.isOrb && Math.random() < 0.1) b.hitIds.push(e.id);
+                    
+                    // Improved Boomerang Hit Logic
+                    if (b.isBoomerang) {
+                        if (b.hitIds.includes(e.id)) {
+                             // Internal cooldown per enemy for boomerang
+                             // We simulate this by small chance to hit again or checking timestamp if we had one
+                             // For simple arcade, 10% chance to re-hit same enemy per frame is okay
+                             if (Math.random() > 0.1) continue;
+                        } else {
+                            b.hitIds.push(e.id);
+                        }
+                    }
+
+                    if (b.isMine) {
+                        createExplosion(b.pos, '#52525b', 10);
+                        audioParams.playExplosion();
+                    }
 
                     e.hp -= dmg;
                     if (b.freeze) e.frozenTimer = 2;
@@ -1158,7 +1472,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                     spawnFloatingText(e.pos, `${Math.floor(dmg)}`, '#fff', 12);
                     createExplosion(e.pos, b.color, 2);
 
-                    if (!b.isOrb && !b.isMelee) {
+                    if (!b.isOrb && !b.isMelee && !b.isBoomerang) {
                         if (b.explodeRadius > 0) {
                              bulletsRef.current.splice(j, 1);
                         } else {
@@ -1205,15 +1519,29 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
   const processKill = (e: Enemy) => {
       killsRef.current++;
       scoreRef.current += e.value;
-      const isBoss = [EnemyType.BOSS_GOLIATH, EnemyType.BOSS_SWARMER, EnemyType.BOSS_TITAN].includes(e.type);
+      const isBoss = e.type.startsWith('BOSS');
       if (isBoss) {
-          // Don't disable bossActiveRef, allow multiple bosses
           spawnFloatingText(e.pos, "ELIMINATED", "#fcd34d", 40);
           shakeRef.current = 50;
           audioParams.playLevelUp();
-          for(let k=0; k<5; k++) spawnLoot({x: e.pos.x + randomRange(-50,50), y: e.pos.y + randomRange(-50,50)}, LootType.XP_ORB);
+          for(let k=0; k<5; k++) spawnLoot({x: e.pos.x + randomRange(-50,50), y: e.pos.y + randomRange(-50,50), type: LootType.XP_ORB} as any, LootType.XP_ORB);
           spawnLoot(e.pos, LootType.HEALTH_PACK);
       }
+      
+      // Splitter Logic
+      if (e.type === EnemyType.SPLITTER) {
+          for (let k=0; k<2; k++) {
+               enemiesRef.current.push({
+                  id: 'MINI_'+Math.random(),
+                  pos: { x: e.pos.x + randomRange(-10,10), y: e.pos.y + randomRange(-10,10) },
+                  type: EnemyType.FAST,
+                  radius: 8, color: '#bef264', // Lighter Lime
+                  hp: 20, maxHp: 20, damage: 5, speed: 200,
+                  value: 10, pushback: {x:0,y:0}
+               });
+          }
+      }
+
       if (Math.random() < LOOT_CONFIG.dropChance) {
           spawnLoot(e.pos, Math.random() < LOOT_CONFIG.healthPackChance ? LootType.HEALTH_PACK : LootType.XP_ORB);
       } else {
@@ -1225,6 +1553,64 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
               onLevelUp();
           }
       }
+  };
+
+  const drawMinimap = (ctx: CanvasRenderingContext2D, canvasW: number, canvasH: number) => {
+        const mapSize = 160;
+        const margin = 20;
+        const mapX = canvasW - mapSize - margin;
+        const mapY = margin;
+        const scaleX = mapSize / WORLD_WIDTH;
+        const scaleY = mapSize / WORLD_HEIGHT;
+
+        ctx.save();
+        
+        // Background
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.fillRect(mapX, mapY, mapSize, mapSize);
+        ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+
+        // Player
+        const p = playerRef.current;
+        const px = mapX + p.pos.x * scaleX;
+        const py = mapY + p.pos.y * scaleY;
+        ctx.fillStyle = '#22d3ee';
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+
+        // Obstacles
+        ctx.fillStyle = '#475569';
+        obstaclesRef.current.forEach(obs => {
+             ctx.fillRect(mapX + obs.pos.x * scaleX, mapY + obs.pos.y * scaleY, obs.width * scaleX, obs.height * scaleY);
+        });
+
+        // Enemies
+        enemiesRef.current.forEach(e => {
+            if (e.type.startsWith('BOSS')) {
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath(); ctx.arc(mapX + e.pos.x*scaleX, mapY + e.pos.y*scaleY, 4, 0, Math.PI*2); ctx.fill();
+            } else {
+                ctx.fillStyle = '#f87171';
+                ctx.fillRect(mapX + e.pos.x*scaleX, mapY + e.pos.y*scaleY, 2, 2);
+            }
+        });
+
+        // Loot
+        ctx.fillStyle = '#fbbf24';
+        lootRef.current.forEach(l => {
+            ctx.fillRect(mapX + l.pos.x*scaleX, mapY + l.pos.y*scaleY, 1.5, 1.5);
+        });
+
+        // Current View Rect
+        const cam = cameraRef.current;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        const vw = (canvasW / WORLD_WIDTH) * mapSize;
+        const vh = (canvasH / WORLD_HEIGHT) * mapSize;
+        ctx.strokeRect(mapX + cam.x*scaleX, mapY + cam.y*scaleY, vw, vh);
+
+        ctx.restore();
   };
 
   const draw = () => {
@@ -1339,12 +1725,20 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
         if (e.type === EnemyType.BASIC) {
             ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-6, 10); ctx.lineTo(-4, 0); ctx.lineTo(-6, -10); ctx.closePath(); ctx.fill();
-            ctx.strokeStyle = e.color; ctx.lineWidth = 2; const legOffset = Math.sin(gameTimeRef.current / 100) * 4;
+            ctx.strokeStyle = e.color; ctx.lineWidth = 2; const legOffset = Math.sin(gameTimeRef.current/100) * 4;
             ctx.beginPath(); ctx.moveTo(-4, 5); ctx.lineTo(-10 + legOffset, 14); ctx.moveTo(-4, -5); ctx.lineTo(-10 - legOffset, -14); ctx.stroke();
         } else if (e.type === EnemyType.FAST) {
             ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
             ctx.fillStyle = e.color; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-8, 14); ctx.lineTo(-4, 0); ctx.lineTo(-8, -14); ctx.fill();
             ctx.fillStyle = '#fff'; ctx.fillRect(-10, -2, 4, 4);
+        } else if (e.type === EnemyType.GHOST) {
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath(); ctx.arc(0,-4, 10, Math.PI, 0); ctx.lineTo(10, 10); ctx.lineTo(5, 5); ctx.lineTo(0, 10); ctx.lineTo(-5, 5); ctx.lineTo(-10, 10); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-4, -4, 2, 0, Math.PI*2); ctx.arc(4, -4, 2, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1.0;
+        } else if (e.type === EnemyType.SPLITTER) {
+             ctx.beginPath(); ctx.rect(-12,-12,24,24); ctx.fill();
+             ctx.fillStyle = '#3f6212'; ctx.beginPath(); ctx.moveTo(-12,-12); ctx.lineTo(12,12); ctx.stroke();
         } else if (e.type === EnemyType.CHARGER) {
             ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-10, 10); ctx.lineTo(-10, -10); ctx.closePath(); ctx.fill();
             ctx.fillStyle = '#fbbf24'; ctx.fillRect(-15, -4, 5, 8);
@@ -1354,7 +1748,7 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
         } else if (e.type === EnemyType.SNIPER) {
             ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(-10, 8); ctx.lineTo(-6, 0); ctx.lineTo(-10, -8); ctx.fill();
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.stroke();
-            if ((e.attackTimer || 0) > 1.5) { // Charging Shot Visual
+            if ((e.attackTimer || 0) > 1.5) { 
                 ctx.strokeStyle = '#e879f9'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(14,0); ctx.lineTo(WORLD_WIDTH, 0); ctx.stroke();
             }
         } else if (e.type === EnemyType.EXPLODER) {
@@ -1368,20 +1762,25 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
             for(let k=0; k<spikes; k++) { const a = (Math.PI*2/spikes) * k + (gameTimeRef.current/300); ctx.moveTo(Math.cos(a)*18, Math.sin(a)*18); ctx.lineTo(Math.cos(a)*30, Math.sin(a)*30); }
             ctx.strokeStyle = e.color; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(5,0,5,0,Math.PI*2); ctx.fill();
         } else if (e.type.startsWith('BOSS')) {
-            // General Boss Shape
             const isGoliath = e.type === EnemyType.BOSS_GOLIATH;
             const isSwarmer = e.type === EnemyType.BOSS_SWARMER;
             
+            // Enraged effect
+            if (e.isEnraged) {
+                ctx.shadowColor = e.color; ctx.shadowBlur = 20;
+            }
+
             ctx.strokeStyle = e.color; ctx.lineWidth = 6; ctx.setLineDash([20, 10]);
             ctx.beginPath(); ctx.arc(0,0, e.radius - 10, gameTimeRef.current/500, gameTimeRef.current/500 + Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
             
             ctx.fillStyle = e.color; 
             if (isGoliath) ctx.fillRect(-40, -40, 80, 80);
             else if (isSwarmer) { ctx.beginPath(); for(let k=0; k<3; k++) { const a = (Math.PI*2/3)*k + gameTimeRef.current/200; ctx.lineTo(Math.cos(a)*50, Math.sin(a)*50); } ctx.fill(); }
-            else { ctx.beginPath(); ctx.arc(0,0, 60, 0, Math.PI*2); ctx.fill(); } // Titan
+            else { ctx.beginPath(); ctx.arc(0,0, 60, 0, Math.PI*2); ctx.fill(); } 
 
             ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0,0, 15, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(Math.cos(gameTimeRef.current/200)*5, Math.sin(gameTimeRef.current/200)*5, 5, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
         }
         
         ctx.restore();
@@ -1401,6 +1800,39 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
 
     ctx.save();
     ctx.translate(p.pos.x, p.pos.y);
+    
+    // Draw Static Field
+    if (p.staticFieldRange > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.staticFieldRange, 0, Math.PI*2);
+        ctx.strokeStyle = p.isThunderGod ? '#60a5fa' : 'rgba(96, 165, 250, 0.3)';
+        ctx.lineWidth = p.isThunderGod ? 3 : 1;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Static arcs
+        if (Math.random() < 0.2) {
+             const angle = Math.random() * Math.PI * 2;
+             const r = Math.random() * p.staticFieldRange;
+             ctx.strokeStyle = '#93c5fd';
+             ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(angle)*r, Math.sin(angle)*r); ctx.stroke();
+        }
+    }
+
+    // Draw Drones
+    if (p.droneCount > 0) {
+        for(let i=0; i<p.droneCount; i++) {
+             const droneAngle = (gameTimeRef.current/500) + (i * (Math.PI*2/p.droneCount));
+             const dx = Math.cos(droneAngle) * 50;
+             const dy = Math.sin(droneAngle) * 50;
+             ctx.save();
+             ctx.translate(dx, dy);
+             ctx.fillStyle = p.isAssaultDrone ? '#f59e0b' : '#34d399';
+             ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(-4, 4); ctx.lineTo(-2, 0); ctx.lineTo(-4, -4); ctx.fill();
+             ctx.restore();
+        }
+    }
     
     if (p.invulnTimer > 0 && Math.floor(gameTimeRef.current / 100) % 2 === 0) {
         ctx.globalAlpha = 0.4;
@@ -1460,6 +1892,39 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
                 ctx.globalAlpha = 0.6;
                 ctx.stroke();
             }
+        } else if (b.isMine) {
+            if (b.isGravityWell) {
+                 // Black hole effect
+                 ctx.fillStyle = '#000';
+                 ctx.beginPath(); ctx.arc(0,0, 10, 0, Math.PI*2); ctx.fill();
+                 ctx.strokeStyle = '#a855f7'; 
+                 ctx.lineWidth = 2;
+                 ctx.beginPath(); ctx.arc(0,0, 15 + Math.sin(gameTimeRef.current/100)*5, 0, Math.PI*2); ctx.stroke();
+            } else {
+                ctx.fillStyle = b.color;
+                ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#ef4444'; ctx.lineWidth=2;
+                const blink = Math.sin(gameTimeRef.current/100) > 0;
+                if (blink) ctx.beginPath(); ctx.arc(0,0,8,0,Math.PI*2); ctx.stroke();
+            }
+        } else if (b.isBoomerang) {
+            ctx.rotate(gameTimeRef.current/20); // Fast spin
+            ctx.fillStyle = b.color;
+            ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+            
+            // Draw Cross Blade
+            const s = b.radius;
+            ctx.beginPath();
+            ctx.moveTo(-s, -s/3); ctx.lineTo(-s/3, -s); ctx.lineTo(0, -s/3); 
+            ctx.lineTo(s/3, -s); ctx.lineTo(s, -s/3); ctx.lineTo(s/3, 0);
+            ctx.lineTo(s, s/3); ctx.lineTo(s/3, s); ctx.lineTo(0, s/3);
+            ctx.lineTo(-s/3, s); ctx.lineTo(-s, s/3); ctx.lineTo(-s/3, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        } else if (b.isDroneShot) {
+            ctx.fillStyle = b.color;
+            ctx.fillRect(-2, -2, 4, 8);
         } else {
             if (b.isOrb && p.isNovaOrbs && b.radius > 12) {
                 ctx.shadowColor = b.color;
@@ -1496,6 +1961,9 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
     });
 
     ctx.restore(); 
+    
+    // UI Layer - Minimap
+    drawMinimap(ctx, canvas.width, canvas.height);
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -1579,9 +2047,11 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
       window.removeEventListener('touchstart', handleTouchStart);
       window.removeEventListener('touchmove', handleTouchMove);
       window.removeEventListener('touchend', handleTouchEnd);
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      cancelAnimationFrame(requestRef.current);
     };
-  }, [update, gameState, inputMode]);
+  }, [gameState, inputMode, update]);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 block" />;
+  return <canvas ref={canvasRef} className="block w-full h-full" />;
 });
+
+GameCanvas.displayName = 'GameCanvas';
