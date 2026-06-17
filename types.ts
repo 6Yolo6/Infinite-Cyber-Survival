@@ -210,8 +210,9 @@ export interface Enemy extends Entity {
   pushback: Vector2; 
   // Mechanics
   attackTimer?: number; // Used for Sniper, Boss abilities
-  actionState?: 'IDLE' | 'CHARGE' | 'ATTACK';
+  actionState?: 'IDLE' | 'PRE_CHARGE' | 'CHARGE' | 'ATTACK';
   isEnraged?: boolean;
+  dashAngle?: number;
 }
 
 export interface Projectile extends Entity {

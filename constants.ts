@@ -420,7 +420,7 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   },
   [EnemyType.CHARGER]: {
     baseHp: 60,
-    baseSpeed: 350, 
+    baseSpeed: 200, 
     baseDamage: 8,
     radius: 10,
     color: '#f97316', 
@@ -481,7 +481,7 @@ export const ENEMY_CONFIG: Record<EnemyType, {
   // BOSS TIERS
   [EnemyType.BOSS_GOLIATH]: {
     baseHp: 8000,
-    baseSpeed: 180, 
+    baseSpeed: 140, 
     baseDamage: 50,
     radius: 70,
     color: '#fbbf24', // Amber

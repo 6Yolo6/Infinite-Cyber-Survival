@@ -1274,13 +1274,23 @@ export const GameCanvas = forwardRef<GameCanvasHandle, GameCanvasProps>(({
              if (e.type === EnemyType.BOSS_GOLIATH) {
                  // Charge attack
                  const chargeInterval = e.isEnraged ? 3 : 5;
-                 if (e.actionState === 'CHARGE') {
-                      moveX *= 4; moveY *= 4; // Rush
-                      if (e.attackTimer > 0.5) { e.actionState = 'IDLE'; e.attackTimer = 0; }
+                 if (e.actionState === 'PRE_CHARGE') {
+                      moveX = 0; moveY = 0; // Stop to aim
+                      if (e.attackTimer > 0.6) { 
+                          e.actionState = 'CHARGE'; 
+                          e.attackTimer = 0; 
+                      }
+                 } else if (e.actionState === 'CHARGE') {
+                      moveX = Math.cos(e.dashAngle || angle) * speed * 3.5 * dtSec; 
+                      moveY = Math.sin(e.dashAngle || angle) * speed * 3.5 * dtSec; // Straight dash
+                      if (e.attackTimer > 0.8) { e.actionState = 'IDLE'; e.attackTimer = 0; }
                  } else {
                       if (e.attackTimer > chargeInterval) {
-                          e.actionState = 'CHARGE'; e.attackTimer = 0;
-                          createExplosion(e.pos, '#fbbf24', 10); // Warning effect
+                          e.actionState = 'PRE_CHARGE'; 
+                          e.attackTimer = 0;
+                          e.dashAngle = angle;
+                          createExplosion(e.pos, '#fbbf24', 15); // Warning effect
+                          spawnFloatingText(e.pos, "⚠️ DASH WARNING", "#fbbf24", 20);
                       }
                  }
              } else if (e.type === EnemyType.BOSS_SWARMER) {
